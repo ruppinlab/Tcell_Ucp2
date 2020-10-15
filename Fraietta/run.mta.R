@@ -2,7 +2,7 @@
 
 library(gembox)
 data("recon1")
-nc <- 16L
+nc <- 16L # number of cores to use, adjust as appropriate
 
 load("./data.for.gem.RData")
 
