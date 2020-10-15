@@ -9,10 +9,10 @@ description
 * R 3.6
 * R packages
   - ImNotaGit/my.utils
-  - ruppinlab/Rcplex2
+  - ruppinlab/Rcplex2: required to run genome-scale metabolic modeling (GEM); otherwise may be omitted
   - ruppinlab/gembox
   - other needed packages can be obtained from CRAN or Bioconductor, please see the R scripts
-* IBM ILOG CPLEX Optimization Studio 12
+* IBM ILOG CPLEX Optimization Studio 12: required to run GEM; otherwise may be omitted
 
 ### Data
 
@@ -24,7 +24,7 @@ Download the data files from [here](url) then decompress them into the **data** 
 
 Prediction of metabolic pathways important for T cell function in the context of anti-CD19 CAR-T therapy, and metabolic flux analysis using the data from Fraietta et al. 2018.
 
-* prepare.data.R: prepare data for genome-scale metabolic modeling (GEM)
+* prepare.data.R: prepare data for GEM
 * run.mta.R: run the MTA algorithm to predict metabolic reactions whose knockout can result in non-responsiveness in anti-CD19 CAR-T therapy
 * run.flux.analysis.R: run metabolic flux analysis comparing the responders vs non-responders of anti-CD19 CAR-T therapy
 
