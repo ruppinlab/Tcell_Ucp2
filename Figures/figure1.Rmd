@@ -1,0 +1,236 @@
+---
+title: "Figure 1"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+library(my.utils)
+library(gembox)
+data("recon1")
+library(latex2exp)
+library(fgsea)
+library(ComplexHeatmap)
+library(circlize)
+```
+
+
+### Figures related to the MTA predictions
+
+```{r}
+load("../Fraietta/mta.res.RData")
+```
+
+Visualizing metabolic pathway enrichment of top MTA predictions (Figure 1B):
+
+```{r, fig.width=3.3, fig.height=2, warning=FALSE}
+dat <- enr.res[padj<0.1]
+dat[, nlogp:=-log10(pval)]
+dat <- dat[gene.set!="Miscellaneous"][order(nlogp)]
+dat[, gene.set:=factor(gene.set, levels=gene.set[order(nlogp)])]
+setnames(dat, c("overlap.size","odds.ratio"), c("pathway size","odds ratio"))
+plot.dot(dat, x="nlogp", y="gene.set", color="odds ratio", size="pathway size", xlab=TeX("-log_{10}P")) +
+  theme(axis.text.y=element_text(size=11, color=ifelse(dat$gene.set %in% c("Oxidative Phosphorylation","Transport, Mitochondrial"), "red3","black")))
+```
+
+Visualizing the enrichment of top MTA predictions for the transportation of each metabolite among the "Transport, Mitochondrial" pathway (Figure 1E):
+
+```{r, fig.width=2.5, fig.height=2, warning=FALSE}
+gs.mito.tx <- get.transport.info(recon1, c1="m", c2="c")
+gs.mito.tx <- lapply(gs.mito.tx, function(x) x$rxn)
+dat1 <- enrich.gsets(mta.res[id!=0 & percent.rank<20 & score>score[id==0], reaction], gs.mito.tx, recon1$rxns)[padj<0.1]
+dat1[, gene.set:=recon1$metNames[all2idx(recon1, paste0(gene.set,"[m]"))]]
+dat1[, nlogp:=-log10(pval)]
+dat1 <- dat1[order(nlogp)]
+dat1[, gene.set:=factor(gene.set, levels=gene.set[order(nlogp)])]
+setnames(dat1, c("overlap.size","odds.ratio"), c("size","odds ratio"))
+
+plot.dot(dat1, x="nlogp", y="gene.set", color="odds ratio", size="size", xlab=TeX("-log_{10}P")) +
+  theme(axis.text.y=element_text(size=11, color=ifelse(dat1$gene.set=="H+", "red3","black")))
+```
+
+Gene set enrichment analysis (GSEA) plots for the "Transport, Mitochondrial" pathway and the set of mitochondrial H+ transportation reactions, respectively (Figure 1F):
+
+```{r, fig.width=2, fig.height=1}
+# transport, mitochondrial
+rs.tx.mito <- recon1$rxns[recon1$subSystems=="Transport, Mitochondrial"]
+x <- mta.res[, score-score[id==0]]
+names(x) <- mta.res$reaction
+x <- x[!is.na(x)]
+plotEnrichment(rs.tx.mito, x)
+# mitochondrial H+ transport specifically
+rs.h <- get.transport.info(recon1, "h", "m", "c")$h$rxn
+plotEnrichment(rs.h, x)
+```
+
+```{r}
+load("../Fraietta/dflux.res.RData")
+```
+
+Box plots comparing the MTA-predicted rankings of two subsets of mitochondrial proton transport reactions: a) those showing higher mitochondrial proton import activity in responders vs non-responders of the anti-CD19 CAR-T therapy from Fraietta et al. 2018, and b) those showing lower mitochondrial proton import activity in responders vs non-responders (Figure 1G):
+
+```{r}
+h.res <- df.res[match(mito.h$id, id), .(id, rxn, equ=mito.h$equ, diff.mean=diff.mean*mito.h$coef, rel.diff=rel.diff*mito.h$coef)][order(diff.mean)]
+h.res[, mta.rnk:=mta.res[match(h.res$id, id), percent.rank]]
+h.dat <- h.res[, .(group=ifelse(diff.mean>1e-6,"higher","lower"), mta.rnk)]
+```
+
+```{r, fig.width=1, fig.height=1}
+ggplot(h.dat, aes(x=group, y=mta.rnk)) +
+  xlab("mito. H+ inflow in\nresponder vs non-responder") + ylab("MTA-Predicted\nTop % Rank") +
+  scale_y_reverse() +
+  geom_blank(data=data.table(group="higher",ym=c(0,100)), aes(y=ym)) +
+  geom_hline(yintercept=c(0,100), linetype="dashed", color="grey60") +
+  geom_point(size=1, color="grey60") +
+  geom_boxplot(aes(color=group), alpha=0) +
+  scale_color_brewer(palette="Dark2") +
+  theme_classic() +
+    theme(
+      axis.title.x=element_text(size=9),
+      axis.text.x=element_text(size=9),
+      axis.title.y=element_text(size=10),
+      axis.text.y=element_text(size=9),
+      plot.margin=margin(0,11,0,0),
+      legend.position="none",
+    )
+```
+
+
+### Figures related to the metabolic flux analysis and flux comparisons
+
+```{r}
+imat.res <- readRDS("../Fraietta/imat.res.RDS")
+```
+
+Violin plots comparing the flux distributions of oxidative phosphorylation/electron transport chain (OXPHOS/ETC) reactions in responders and non-responders of the anti-CD19 CAR-T therapy from Fraietta et al. 2018 (Figure 1C):
+
+```{r, fig.width=2.3, fig.height=1}
+plot.fluxes2(imat.res$nr$result.model, imat.res$r$result.model, group.names=c("non-responder","responder"),
+             rxns=list(`Complext 1`="NADH2_DASH_u10m", `Complext 3`="CYOR_DASH_u10m", `Complext 4`="CYOOm3", `ATP Synthase`="ATPS4m"),
+             ylims=list(c(40,60), c(60,80), c(25,45), c(150,170)))
+```
+
+Violin plots comparing the flux distributions of total mitochondrial proton inflow in responders and non-responders of the anti-CD19 CAR-T therapy from Fraietta et al. 2018 (Figure 1H):
+
+```{r}
+mito.h <- get.transport.info(recon1, "h", "m", "c")$h[id %in% which(recon1$subSystems=="Transport, Mitochondrial")]
+```
+
+```{r, fig.width=1, fig.height=1}
+plot.fluxes2(imat.res$nr$result.model, imat.res$r$result.model, group.names=c("non-responder","responder"), rxns=list(mito.h$rxn), coefs=list(mito.h$coef), ylab="Total Mitochondrial H+ Inflow\n(Excluding ETC\n and ATP Synthase)", ylim=c(120,190)) +
+  theme(legend.direction="vertical",
+        axis.title.y=element_text(size=9),
+        legend.box.margin=margin(-12,-12,-8,-12))
+```
+
+Violin plots comparing the flux distributions of the mitochondrial uncoupling reaction in responders and non-responders of the anti-CD19 CAR-T therapy from Fraietta et al. 2018 (Figure 1I):
+
+```{r, fig.width=1, fig.height=1}
+plot.fluxes2(imat.res$nr$result.model, imat.res$r$result.model, group.names=c("non-responder","responder"), rxns="Htm", ylab="Mitochondrial Uncoupling\n Reaction Rate", ylim=c(1,2.5)) +
+  theme(legend.direction="vertical",
+        legend.box.margin=margin(-12,-12,-8,-12))
+```
+
+```{r}
+imat.res.lu <- readRDS("../Lu/imat.res.RDS")
+```
+
+Violin plots comparing the flux distributions of OXPHOS/ETC reactions in the non-persistent and persistent T cell clones in adoptive cell transfer therapy from Lu et al. 2019 (Figure 1D):
+
+```{r, fig.width=2.3, fig.height=1}
+plot.fluxes2(imat.res.lu$np9$result.model, imat.res.lu$p9$result.model, group.names=c("non-persistent (clone 9.1-NP)", "persistent (clone 9.2-P)"),
+             rxns=list(`Complext 1`="NADH2_DASH_u10m", `Complext 3`="CYOR_DASH_u10m", `Complext 4`="CYOOm3", `ATP Synthase`="ATPS4m"),
+             ylims=list(c(-10,40), c(-10,40), c(-10,40), c(20,100)))
+```
+
+Violin plots comparing the flux distributions of the mitochondrial uncoupling reaction in the non-persistent and persistent T cell clones in adoptive cell transfer therapy from Lu et al. 2019 (Figure 1J):
+
+```{r, fig.width=1, fig.height=1}
+plot.fluxes2(imat.res.lu$np9$result.model, imat.res.lu$p9$result.model, group.names=c("non-persistent (clone 9.1-NP)", "persistent (clone 9.2-P)"), rxns="Htm", ylab="Mitochondrial Uncoupling\n Reaction Rate", ylim=c(NA,10)) +
+  theme(axis.title.y=element_text(size=10),
+        legend.direction="vertical",
+        legend.box.margin=margin(-8,5,-8,-20))
+```
+
+
+### Figures related to analyzing UCP expression in the TCGA dataset
+
+Heatmap summarizing the expressions of UCP1, UCP2, and UCP3 genes across human normal tissue types (Figure 1K):
+
+```{r}
+dat.tis <- readRDS("../data/hpa.rna.tissue.consensus.RDS")
+```
+
+```{r}
+dat.tis <- dat.tis[`Gene name` %in% c("UCP1","UCP2","UCP3"), .(gene=`Gene name`, tissue=Tissue, y=NX)][!tissue %in% c("B-cells","NK-cells","T-cells","appendix","dendritic cells","ductus deferens","duodenum","epididymis","fallopian tube","granulocytes","lymph node","monocytes","parathyroid gland","placenta","retina","salivary gland","seminal vesicle","tongue","tonsil","smooth muscle","heart muscle","gallbladder","vagina","endometrium","skeletal muscle")]
+dat.tis[tissue %in% c("amygdala","basal ganglia","cerebellum","cerebral cortex","corpus callosum","hippocampal formation","hypothalamus","midbrain","olfactory region","pituitary gland","pons and medulla","substantia nigra","thalamus"), tissue:="brain"]
+dat.tis <- dat.tis[, .(y=mean(y)), by=.(gene, tissue)]
+dat.tis <- dcast(dat.tis, gene ~ tissue, value.var="y")
+tmp <- dat.tis$gene
+dat.tis <- data.matrix(dat.tis[,-1])
+rownames(dat.tis) <- tmp
+dat.tis <- log(dat.tis+1)
+```
+
+```{r, fig.width=3, fig.height=1}
+Heatmap(dat.tis,
+      name="log expr.",
+      col=c("grey80","red"),
+      border="grey50",
+      rect_gp=gpar(col="white", lwd=1),
+      row_names_side="left",
+      cluster_rows=FALSE,
+      column_names_rot=45,
+      column_names_gp=gpar(fontsize=11),
+      column_names_max_height=unit(30, "mm")
+   )
+```
+
+Heatmap summarizing the correlations between the expressions of UCP2 and several T cell memory and stemness genes (after controlling for tumor purity) across TCGA cancer types (Figure 1L):
+
+```{r}
+cor.res <- readRDS("../TCGA/Tm.gene.cor.RDS")
+```
+
+```{r}
+cor.res.coefs <- t(sapply(cor.res, function(x) {
+  res <- x$coef
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.padjs <- t(sapply(cor.res, function(x) {
+  res <- x$padj
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.coefs <- cor.res.coefs[1:4,colnames(cor.res.coefs)!="LAML"]
+cor.res.padjs <- cor.res.padjs[1:4,colnames(cor.res.padjs)!="LAML"]
+```
+
+```{r, fig.width=3, fig.height=1}
+col_fun  <- colorRamp2(c(-1, 0, 1), c("blue2", "grey90", "red2"))
+
+Heatmap(cor.res.coefs,
+      name="coef.",
+      col=col_fun,
+      border="grey50",
+      rect_gp=gpar(col="white", lwd=1),
+      row_names_side="left",
+      cluster_rows=FALSE,
+      column_names_rot=45,
+      column_names_gp=gpar(fontsize=11),
+      column_names_max_height=unit(30, "mm"),
+      cell_fun=function(j, i, x, y, width, height, fill) {
+        if (cor.res.padjs[i,j]<0.05) grid.points(x, y, pch="*", gp=gpar(col="grey30", fontsize=10))
+      }
+   )
+```
+
+
+
+
+
+

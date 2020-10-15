@@ -41,3 +41,9 @@ Analysis of UCP2 gene expression in different cancer types using the TCGA datase
 
 * check.ucp2.association.R: analyze the association between UCP2 expression and T cell memory/stemness genes, and patient survival
 
+### Figures
+
+R notebooks for generating the some of the figures in the paper.
+
+* figure1.Rmd
+
