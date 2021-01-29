@@ -156,7 +156,7 @@ plot.fluxes2(imat.res.lu$np9$result.model, imat.res.lu$p9$result.model, group.na
 ```
 
 
-### Figures related to analyzing UCP expression in the TCGA dataset
+### Figures related to analyzing UCP expression in the HPA and TCGA datasets
 
 Heatmap summarizing the expressions of UCP1, UCP2, and UCP3 genes across human normal tissue types (Figure 1K):
 
@@ -193,6 +193,7 @@ Heatmap summarizing the correlations between the expressions of UCP2 and several
 
 ```{r}
 cor.res <- readRDS("../TCGA/Tm.gene.cor.RDS")
+cor.res <- lapply(cor.res, function(x) x[cancer.type!="OV"]) # the OV result seems to be driven by an outlier
 ```
 
 ```{r}

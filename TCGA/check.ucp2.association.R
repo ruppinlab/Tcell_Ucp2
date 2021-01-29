@@ -1,4 +1,5 @@
 library(my.utils)
+library(survival)
 
 dat <- readRDS("../data/tcga.xena.tmm.log.cpm.by.cancer.type.RDS")
 tcga.purity <- readRDS("../data/tcga.purity.RDS")
@@ -25,7 +26,7 @@ check.cor <- function(gn1, gn2="UCP2") {
   res[order(padj,pval)]
 }
 
-gns <- cn("CD8A","TCF7","CD27","SELL","IL7R")
+gns <- cn("CD8A","TCF7","CD27","SELL")
 res <- lapply(gns, check.cor)
 saveRDS(res, file="Tm.gene.cor.RDS")
 
@@ -41,11 +42,11 @@ surv.res <- rbindlist(lapply(dat, function(x) {
   dt1 <- dt1[!grepl("c4", subtype.immune)]
   tryCatch({
     cox.res <- coef(summary(coxph(Surv(os.days, os) ~ y + age + stage1 + strata(gender, race1), data=dt1)))
-    list(coef=cox.res["y","coef"], pval=cox.res["y","Pr(>|z|)"])
-  }, error=function(e) list(coef=NA, pval=NA))
+    data.table(coef=cox.res["y","coef"], pval=cox.res["y","Pr(>|z|)"])
+  }, error=function(e) data.table(coef=NA, pval=NA))
 }), idcol="cancer.type")
 surv.res[, padj:=p.adjust(pval, "BH")]
 surv.res <- surv.res[order(padj,pval)]
 
-save(surv.res, file="surv.res.RDS")
+saveRDS(surv.res, file="surv.res.RDS")
 
