@@ -17,9 +17,11 @@ check.cor <- function(gn1, gn2="UCP2") {
   res <- rbindlist(lapply(dat1, function(x) {
     #tmp <- cor.test(x$expr[x$geneid$symbol==gn1,], x$expr[x$geneid$symbol==gn2,], method="s")
     #data.table(rho=tmp$estimate, pval=tmp$p.value)
-    dt1 <- data.table(g1=x$expr[x$geneid$symbol==gn1,], g2=x$expr[x$geneid$symbol==gn2,], purity=x$pheno$purity)
-    res <- coef(summary(lm(g2 ~ g1 + purity, data=dt1)))
-    res <- data.table(coef=res["g1", "Estimate"], pval=res["g1", "Pr(>|t|)"])
+    tryCatch({
+      dt1 <- data.table(g1=x$expr[x$geneid$symbol==gn1,], g2=x$expr[x$geneid$symbol==gn2,], purity=x$pheno$purity)
+      res <- coef(summary(lm(g2 ~ g1 + purity, data=dt1)))
+      res <- data.table(coef=res["g1", "Estimate"], pval=res["g1", "Pr(>|t|)"])
+    }, error=function(e) data.table(coef=NA, pval=NA))
   }), idcol="cancer.type")
   res[, cancer.type:=toupper(cancer.type)]
   res[, padj:=p.adjust(pval, "BH")]
@@ -29,6 +31,9 @@ check.cor <- function(gn1, gn2="UCP2") {
 gns <- cn("CD8A","TCF7","CD27","SELL")
 res <- lapply(gns, check.cor)
 saveRDS(res, file="Tm.gene.cor.RDS")
+res.ucp1 <- lapply(gns, check.cor, gn2="UCP1")
+res.ucp3 <- lapply(gns, check.cor, gn2="UCP3")
+saveRDS(list(ucp1=res.ucp1, ucp3=res.ucp3), file="Tm.gene.cor.ucp1and3.RDS")
 
 
 ### check the association between UCP2 gene expression and cancer patient survival, in each TCGA cancer type
