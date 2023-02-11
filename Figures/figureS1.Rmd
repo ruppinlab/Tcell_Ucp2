@@ -1,0 +1,160 @@
+---
+title: "Figure S1 and related figures"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+library(my.utils)
+library(ComplexHeatmap)
+library(circlize)
+```
+
+### Correlations between the expressions of UCP2 and several T cell memory and stemness genes (after controlling for tumor purity) across TCGA cancer types
+
+```{r}
+dat <- readRDS("../data/tcga.xena.tmm.log.cpm.by.cancer.type.RDS")
+tcga.purity <- readRDS("../data/tcga.purity.RDS")
+for (i in names(dat)) {
+  if (toupper(i) %in% names(tcga.purity)) {
+    dat[[i]]$pheno$purity <- tcga.purity[[toupper(i)]]$purity[match(dat[[i]]$pheno$sample.id, tcga.purity[[toupper(i)]]$sample.id)]
+  }
+}
+names(dat) <- toupper(names(dat))
+cor.res <- readRDS("../TCGA/Tm.gene.cor.RDS")
+```
+
+```{r}
+get.dat <- function(gn, ct=NULL) {
+  dat1 <- dat[sapply(dat, function(x) "purity" %in% names(x$pheno))]
+  dat1 <- dat1[names(dat1)!="OV"] # the OV result seems to be driven by an outlier
+  if (!is.null(ct)) dat1 <- dat1[ct]
+  res <- rbindlist(lapply(dat1, function(x) {
+    dt1 <- data.table(y=x$expr[x$geneid$symbol==gn,], ucp2=x$expr[x$geneid$symbol=="UCP2",], purity=x$pheno$purity)
+    r.y <- resid(lm(y ~ purity, data=dt1))
+    r.x <- resid(lm(ucp2 ~ purity, data=dt1))
+    data.table(x=r.x, y=r.y)
+  }), idcol="cancer.type")
+}
+
+plt <- function(gn, ct=NULL, nr=NULL) {
+  dt1 <- get.dat(gn, ct)
+  if (is.null(ct)) dt1 <- dt1[cancer.type %in% cor.res[[gn]][padj<0.05 & coef>0, cancer.type]] else dt1 <- dt1[cancer.type %in% ct]
+  ggplot(dt1, aes(x=x, y=y)) +
+    xlab("UCP2 controlled for tumor purity") + ylab(paste(gn,"controlled for\n tumor purity")) +
+    facet_wrap(~cancer.type, scales="free", nrow=nr) +
+    geom_point(size=0.6, alpha=0.5) +
+    geom_smooth(method="lm", size=0.5, alpha=0.4) +
+    theme_classic()
+}
+```
+
+```{r, fig.width=2.8, fig.height=1.8}
+plt("CD8A")
+```
+
+```{r, fig.width=3, fig.height=0.8}
+plt("CD8A", c("HNSC","KIRP","LIHC","STAD","SKCM"), 1)
+```
+
+```{r, fig.width=2.8, fig.height=1.8}
+plt("TCF7")
+```
+
+```{r, fig.width=3, fig.height=0.8}
+plt("TCF7", c("HNSC","KIRP","LIHC","STAD","SKCM"), 1)
+```
+
+```{r, fig.width=2.8, fig.height=2.2}
+plt("CD27")
+```
+
+```{r, fig.width=3, fig.height=0.8}
+plt("CD27", c("HNSC","KIRP","LIHC","STAD","SKCM"), 1)
+```
+
+```{r, fig.width=2.8, fig.height=2.2}
+plt("SELL")
+```
+
+```{r, fig.width=3, fig.height=0.8}
+plt("SELL", c("HNSC","KIRP","LIHC","STAD","SKCM"), 1)
+```
+
+### Heatmap summarizing the correlations between the expressions of UCP1 or UCP3 and several T cell memory and stemness genes (after controlling for tumor purity) across TCGA cancer types:
+
+```{r}
+cor.res <- readRDS("../TCGA/Tm.gene.cor.ucp1and3.RDS")
+```
+
+UCP1 (in many cancer types, this gene was very lowly expressed and was filtered during preprocessing, thus no results were obtained -- these have NA values):
+
+```{r, fig.width=6, fig.height=2}
+cor.res.coefs <- t(sapply(cor.res$ucp1, function(x) {
+  res <- x$coef
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.padjs <- t(sapply(cor.res$ucp1, function(x) {
+  res <- x$padj
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.coefs <- cor.res.coefs[1:4,colnames(cor.res.coefs)!="LAML"]
+cor.res.padjs <- cor.res.padjs[1:4,colnames(cor.res.padjs)!="LAML"]
+
+col_fun  <- colorRamp2(c(-1, 0, 1), c("blue2", "grey90", "red2"))
+
+Heatmap(cor.res.coefs,
+      name="coef.",
+      col=col_fun,
+      border="grey50",
+      rect_gp=gpar(col="white", lwd=1),
+      row_names_side="left",
+      cluster_rows=FALSE,
+      cluster_columns=FALSE,
+      column_names_rot=45,
+      column_names_gp=gpar(fontsize=11),
+      column_names_max_height=unit(30, "mm"),
+      cell_fun=function(j, i, x, y, width, height, fill) {
+        if (!is.na(cor.res.padjs[i,j]) && cor.res.padjs[i,j]<0.05) grid.points(x, y, pch="*", gp=gpar(col="grey30", fontsize=10))
+      }
+   )
+```
+
+UCP3:
+
+```{r, fig.width=6, fig.height=2}
+cor.res.coefs <- t(sapply(cor.res$ucp3, function(x) {
+  res <- x$coef
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.padjs <- t(sapply(cor.res$ucp3, function(x) {
+  res <- x$padj
+  names(res) <- x$cancer.type
+  res
+}))
+cor.res.coefs <- cor.res.coefs[1:4,colnames(cor.res.coefs)!="LAML"]
+cor.res.padjs <- cor.res.padjs[1:4,colnames(cor.res.padjs)!="LAML"]
+
+col_fun  <- colorRamp2(c(-1, 0, 1), c("blue2", "grey90", "red2"))
+
+Heatmap(cor.res.coefs,
+      name="coef.",
+      col=col_fun,
+      border="grey50",
+      rect_gp=gpar(col="white", lwd=1),
+      row_names_side="left",
+      cluster_rows=FALSE,
+      column_names_rot=45,
+      column_names_gp=gpar(fontsize=11),
+      column_names_max_height=unit(30, "mm"),
+      cell_fun=function(j, i, x, y, width, height, fill) {
+        if (cor.res.padjs[i,j]<0.05) grid.points(x, y, pch="*", gp=gpar(col="grey30", fontsize=10))
+      }
+   )
+```
